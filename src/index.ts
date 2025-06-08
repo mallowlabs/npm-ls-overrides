@@ -93,7 +93,7 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
 
     // Parse the output to find actually overridden packages
     const overrides = parseExplainOutput(explainOutput, aliasMap);
-    
+
     return overrides;
   } catch (error) {
     console.error('Error analyzing overrides:', error);
@@ -469,7 +469,7 @@ export function parseExplainOutput(explainOutput: NpmExplainOutput, aliasMap?: M
 
       // Build all dependency paths from the dependents information
       const { dependencyPaths, pathsWithRawSpecs } = buildAllDependencyPathsWithRawSpecs(
-        packageInfo, 
+        packageInfo,
         actualPackageName ? { aliasName: packageInfo.name, actualName: actualPackageName } : undefined
       );
 
@@ -499,7 +499,7 @@ function buildAllDependencyPathsWithRawSpecs(packageInfo: NpmExplainPackage, ali
   const pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>> = [];
 
   // Add the overridden package as the root - use alias format if aliased
-  const rootPackage = aliasInfo 
+  const rootPackage = aliasInfo
     ? `${aliasInfo.aliasName}>${aliasInfo.actualName}@${packageInfo.version}`
     : `${packageInfo.name}@${packageInfo.version}`;
 
