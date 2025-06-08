@@ -15,20 +15,6 @@ export interface PackageOverride {
   dependencyPath: string;
 }
 
-export interface NpmLsPackageInfo {
-  version?: string;
-  resolved?: string;
-  overridden?: boolean;
-  dependencies?: Record<string, NpmLsPackageInfo>;
-}
-
-export interface NpmLsOutput {
-  name?: string;
-  version?: string;
-  dependencies?: Record<string, NpmLsPackageInfo>;
-  overrides?: Record<string, string>;
-}
-
 export interface UnusedOverride {
   name: string;
   version: string;
@@ -38,93 +24,6 @@ export interface PackageJson {
   name?: string;
   version?: string;
   overrides?: Record<string, string>;
-}
-
-/**
- * Execute npm ls --all --json in the specified directory and return the output
- * @param targetDir - The directory to execute npm ls in
- * @returns The JSON output from npm ls command
- */
-export function getNpmLsOutput(targetDir: string): NpmLsOutput {
-  try {
-    const absolutePath = path.resolve(targetDir);
-    const command = 'npm ls --all --json';
-
-    const output = execSync(command, {
-      cwd: absolutePath,
-      encoding: 'utf8',
-      // Suppress stderr to avoid warnings being mixed with JSON output
-      stdio: ['pipe', 'pipe', 'ignore']
-    });
-
-    return JSON.parse(output);
-  } catch (error) {
-    if (error instanceof Error && 'stdout' in error) {
-      // npm ls might exit with non-zero status even when output is valid JSON
-      // (e.g., when there are peer dependency warnings)
-      try {
-        return JSON.parse((error as any).stdout);
-      } catch (parseError) {
-        throw new Error(`Failed to parse npm ls output: ${parseError}`);
-      }
-    }
-    throw new Error(`Failed to execute npm ls in directory ${targetDir}: ${error}`);
-  }
-}
-
-/**
- * Recursively traverse dependencies and find packages that are overridden
- * @param dependencies - The dependencies object from npm ls output
- * @param overrides - Array to collect found overrides
- * @param parentPath - Array of parent packages with their version info
- */
-export function findOverriddenPackages(
-  dependencies: Record<string, NpmLsPackageInfo> | undefined,
-  overrides: PackageOverride[] = [],
-  parentPath: Array<{name: string, version: string}> = []
-): PackageOverride[] {
-  if (!dependencies || typeof dependencies !== 'object') {
-    return overrides;
-  }
-
-  for (const [packageName, packageInfo] of Object.entries(dependencies)) {
-    if (!packageInfo || typeof packageInfo !== 'object') {
-      continue;
-    }
-
-    // Create current package info with version
-    const currentPackage = {
-      name: packageName,
-      version: packageInfo.version || 'unknown'
-    };
-
-    const currentPath = [...parentPath, currentPackage];
-    const currentPathString = currentPath.map(p => p.name).join(' > ');
-
-    // Check if this package is overridden
-    if (packageInfo.overridden === true) {
-      // Create dependency path from overridden package to root (reverse order) with versions
-      const dependencyPath = currentPath
-        .map(p => `${p.name}@${p.version}`)
-        .reverse()
-        .join(' > ');
-
-      const override: PackageOverride = {
-        name: packageName,
-        version: packageInfo.version || 'unknown',
-        dependencyPath
-      };
-
-      overrides.push(override);
-    }
-
-    // Recursively check nested dependencies
-    if (packageInfo.dependencies) {
-      findOverriddenPackages(packageInfo.dependencies, overrides, currentPath);
-    }
-  }
-
-  return overrides;
 }
 
 /**
@@ -153,10 +52,21 @@ export function getPackageJson(targetDir: string): PackageJson {
  */
 export function analyzeOverrides(targetDir: string = process.cwd()): PackageOverride[] {
   try {
-    const npmLsOutput = getNpmLsOutput(targetDir);
+    // Get package.json to find defined overrides
+    const packageJson = getPackageJson(targetDir);
+    
+    if (!packageJson.overrides) {
+      return [];
+    }
 
-    // Find all overridden packages in the dependency tree
-    return findOverriddenPackages(npmLsOutput.dependencies);
+    // Get package names from overrides
+    const packageNames = Object.keys(packageJson.overrides);
+    
+    // Use npm explain to get detailed information about these packages
+    const explainOutput = getNpmExplainOutput(targetDir, packageNames);
+    
+    // Parse the output to find actually overridden packages
+    return parseExplainOutput(explainOutput);
   } catch (error) {
     console.error('Error analyzing overrides:', error);
     return [];
@@ -261,4 +171,132 @@ function main(): void {
 // Run if this file is executed directly
 if (require.main === module) {
   main();
+}
+
+export interface NpmExplainDependent {
+  type: string;
+  name: string;
+  spec: string;
+  rawSpec?: string;
+  overridden?: boolean;
+  from?: {
+    name?: string;
+    version?: string;
+    location: string;
+    isWorkspace?: boolean;
+    dependents?: NpmExplainDependent[];
+  };
+}
+
+export interface NpmExplainPackage {
+  name: string;
+  version: string;
+  location: string;
+  isWorkspace: boolean;
+  dependents: NpmExplainDependent[];
+  dev: boolean;
+  optional: boolean;
+  devOptional: boolean;
+  peer: boolean;
+  bundled: boolean;
+  overridden?: boolean;
+}
+
+export interface NpmExplainOutput extends Array<NpmExplainPackage> {}
+
+/**
+ * Execute npm explain for specified packages and return the output
+ * @param targetDir - The directory to execute npm explain in
+ * @param packageNames - Array of package names to explain
+ * @returns The JSON output from npm explain command
+ */
+export function getNpmExplainOutput(targetDir: string, packageNames: string[]): NpmExplainOutput {
+  if (packageNames.length === 0) {
+    return [];
+  }
+
+  try {
+    const absolutePath = path.resolve(targetDir);
+    const command = `npm explain ${packageNames.join(' ')} --json`;
+
+    const output = execSync(command, {
+      cwd: absolutePath,
+      encoding: 'utf8',
+      // Suppress stderr to avoid warnings being mixed with JSON output
+      stdio: ['pipe', 'pipe', 'ignore']
+    });
+
+    return JSON.parse(output);
+  } catch (error) {
+    if (error instanceof Error && 'stdout' in error) {
+      // npm explain might exit with non-zero status for non-existent packages
+      // but still provide valid JSON output for existing ones
+      try {
+        const stdout = (error as any).stdout;
+        if (stdout && stdout.trim()) {
+          const parsed = JSON.parse(stdout);
+          // Check if it's an error response
+          if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+            return [];
+          }
+          // Return parsed result if it's a valid array
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      } catch (parseError) {
+        // If parsing fails, return empty array
+      }
+    }
+    // Return empty array instead of throwing error for non-existent packages
+    return [];
+  }
+}
+
+/**
+ * Parse npm explain output to find overridden packages
+ * @param explainOutput - The output from npm explain command
+ * @returns Array of package overrides
+ */
+export function parseExplainOutput(explainOutput: NpmExplainOutput): PackageOverride[] {
+  const overrides: PackageOverride[] = [];
+
+  for (const packageInfo of explainOutput) {
+    if (packageInfo.overridden === true) {
+      // Build dependency path from the dependents information
+      const dependencyPath = buildDependencyPath(packageInfo);
+      
+      const override: PackageOverride = {
+        name: packageInfo.name,
+        version: packageInfo.version,
+        dependencyPath
+      };
+
+      overrides.push(override);
+    }
+  }
+
+  return overrides;
+}
+
+/**
+ * Build dependency path from npm explain package info
+ * @param packageInfo - Package information from npm explain
+ * @returns Dependency path string
+ */
+function buildDependencyPath(packageInfo: NpmExplainPackage): string {
+  const path: string[] = [];
+  
+  // Add the overridden package first
+  path.push(`${packageInfo.name}@${packageInfo.version}`);
+  
+  // Find the dependency chain through dependents
+  if (packageInfo.dependents && packageInfo.dependents.length > 0) {
+    const dependent = packageInfo.dependents[0]; // Take the first dependent
+    if (dependent.from && dependent.from.name) {
+      path.push(`${dependent.from.name}@${dependent.from.version || 'unknown'}`);
+    }
+  }
+  
+  return path.join(' > ');
 }
