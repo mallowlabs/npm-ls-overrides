@@ -6,6 +6,7 @@ A tool to analyze npm package dependencies and detect both used and unused overr
 
 - **Detect used overrides**: Lists packages that are actually overridden in the dependency tree
 - **Detect unused overrides**: Identifies overrides defined in `package.json` but not used in the dependency tree  
+- **Show original version specs**: Displays the original version specification (rawSpec) that was overridden, helping identify potential downgrades
 - **Tree-style output**: Displays dependency relationships in an easy-to-read tree format
 - **Exit code handling**: Returns exit code 1 when unused overrides are found
 
@@ -36,8 +37,10 @@ If no directory is specified, the current directory is used.
 $ npx npm-ls-overrides
 Found 1 overridden package(s):
 send@0.19.1
- - honkit@6.0.3
+ - honkit@6.0.3 (^0.17.2)
 ```
+
+The `(^0.17.2)` shows the original version specification that was overridden. This helps you verify whether you're overriding to an older version that might introduce security or compatibility issues.
 
 ### Unused Override
 
@@ -57,7 +60,7 @@ send@0.19.1
 $ npx npm-ls-overrides
 Found 1 overridden package(s):
 send@0.19.1
- - honkit@6.0.3
+ - honkit@6.0.3 (^0.17.2)
 
 ⚠️  Found 1 unused override(s):
 trim@0.0.3 (not used in dependency tree)

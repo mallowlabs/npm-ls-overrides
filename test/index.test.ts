@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeOverrides, getPackageJson, findUnusedOverrides, getNpmExplainOutput, parseExplainOutput, formatAsUnifiedTree } from '../src/index'
+import { analyzeOverrides, getPackageJson, findUnusedOverrides, getNpmExplainOutput, parseExplainOutput, formatAsUnifiedTree, formatAsUnifiedTreeFromPathsWithRawSpecs } from '../src/index'
 import * as path from 'path'
 
 describe('analyzeOverrides', () => {
@@ -33,6 +33,9 @@ describe('analyzeOverrides', () => {
     expect(sendOverride?.dependencyPaths).toBeDefined()
     expect(sendOverride?.dependencyPaths.length).toBeGreaterThan(0)
     expect(sendOverride?.dependencyPaths[0]).toContain('send@0.19.1')
+    expect(sendOverride?.pathsWithRawSpecs).toBeDefined()
+    expect(sendOverride?.pathsWithRawSpecs.length).toBeGreaterThan(0)
+    expect(sendOverride?.pathsWithRawSpecs[0]).toBeDefined()
   })
 })
 
@@ -144,9 +147,12 @@ describe('parseExplainOutput', () => {
     expect(result[0]).toHaveProperty('name', 'send')
     expect(result[0]).toHaveProperty('version')
     expect(result[0]).toHaveProperty('dependencyPaths')
+    expect(result[0]).toHaveProperty('pathsWithRawSpecs')
     expect(result[0].dependencyPaths).toBeDefined()
     expect(result[0].dependencyPaths.length).toBeGreaterThan(0)
     expect(result[0].dependencyPaths[0]).toContain('send@')
+    expect(result[0].pathsWithRawSpecs).toBeDefined()
+    expect(result[0].pathsWithRawSpecs.length).toBeGreaterThan(0)
   })
 
   it('should return empty array for non-overridden packages', () => {
@@ -166,16 +172,16 @@ describe('formatAsUnifiedTree', () => {
     ];
 
     const result = formatAsUnifiedTree(paths);
-    
+
     expect(result).toContain('cheerio@1.0.0-rc.12');
     expect(result).toContain('@honkit/html@6.0.3');
     expect(result).toContain('@honkit/asciidoc@6.0.3');
     expect(result).toContain('@honkit/markdown-legacy@6.0.3');
-    
+
     // Should show unified structure - @honkit/html should appear only once
     const htmlMatches = result.match(/@honkit\/html@6\.0\.3/g);
     expect(htmlMatches?.length).toBe(1);
-    
+
     console.log('Unified tree output:');
     console.log(result);
   });
@@ -183,7 +189,7 @@ describe('formatAsUnifiedTree', () => {
   it('should handle single path correctly', () => {
     const paths = ['send@0.19.1 > honkit@6.0.3'];
     const result = formatAsUnifiedTree(paths);
-    
+
     expect(result).toContain('send@0.19.1');
     expect(result).toContain('honkit@6.0.3');
   });
@@ -191,7 +197,53 @@ describe('formatAsUnifiedTree', () => {
   it('should handle empty paths array', () => {
     const paths: string[] = [];
     const result = formatAsUnifiedTree(paths);
-    
+
     expect(result).toBe('');
   });
+
+  it('should display rawSpec information when provided', () => {
+    const paths = ['send@0.19.1 > honkit@6.0.3'];
+    const rawSpecs = ['^0.17.2'];
+    const result = formatAsUnifiedTree(paths, rawSpecs);
+
+    expect(result).toContain('send@0.19.1');
+    expect(result).toContain('honkit@6.0.3 (^0.17.2)');
+  });
+
+  it('should handle multiple paths with rawSpecs', () => {
+    const paths = [
+      'lodash@4.17.21 > async@2.6.4 > kuromoji@0.1.2',
+      'lodash@4.17.21 > i18n-t@1.0.1 > honkit@6.0.3'
+    ];
+    const rawSpecs = ['^4.17.14', '^4.13.1'];
+    const result = formatAsUnifiedTree(paths, rawSpecs);
+
+    expect(result).toContain('lodash@4.17.21');
+    expect(result).toContain('kuromoji@0.1.2 (^4.17.14)');
+    expect(result).toContain('honkit@6.0.3 (^4.13.1)');
+  });
+
+  it('should display parent rawSpecs correctly in tree structure', () => {
+    // Create mock data that mimics the lodash.json example mentioned in the conversation
+    const pathsWithRawSpecs = [
+      [
+        { name: 'lodash@4.17.21' },
+        { name: 'async@2.6.4', rawSpec: '^4.17.14' },
+      ],
+      [
+        { name: 'lodash@4.17.21' },
+        { name: 'async@2.6.4', rawSpec: '^4.17.14' },
+        { name: 'kuromoji@0.1.2', rawSpec: '^2.0.1' },
+      ]
+    ]
+
+    const result = formatAsUnifiedTreeFromPathsWithRawSpecs(pathsWithRawSpecs)
+    console.log('RawSpec chain test output:')
+    console.log(result)
+
+    // Check that async shows lodash's rawSpec (^4.17.14)
+    expect(result).toContain('async@2.6.4 (^4.17.14)')
+    // Check that kuromoji shows async's rawSpec (^2.0.1)
+    expect(result).toContain('kuromoji@0.1.2 (^2.0.1)')
+  })
 })
