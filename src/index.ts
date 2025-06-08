@@ -116,18 +116,8 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
     console.log(`Analyzing npm package overrides in: ${targetDir}`);
     const npmLsOutput = getNpmLsOutput(targetDir);
 
-    console.log('npm ls output structure:', {
-      name: npmLsOutput.name,
-      version: npmLsOutput.version,
-      hasOverrides: !!npmLsOutput.overrides,
-      dependenciesCount: npmLsOutput.dependencies ? Object.keys(npmLsOutput.dependencies).length : 0
-    });
-
     // Find all overridden packages in the dependency tree
-    const overrides = findOverriddenPackages(npmLsOutput.dependencies);
-
-    console.log(`Found ${overrides.length} overridden package(s)`);
-    return overrides;
+    return findOverriddenPackages(npmLsOutput.dependencies);
   } catch (error) {
     console.error('Error analyzing overrides:', error);
     return [];
@@ -141,13 +131,11 @@ function main(): void {
   // Get target directory from command line arguments or use current directory
   const targetDir = process.argv[2] || process.cwd();
 
-  console.log('=== npm-ls-overrides ===');
   const overrides = analyzeOverrides(targetDir);
 
   if (overrides.length === 0) {
     console.log('No overridden packages found.');
   } else {
-    console.log('\n=== Summary ===');
     console.log(`Found ${overrides.length} overridden package(s):`);
     overrides.forEach((override, index) => {
       console.log(`${index + 1}. ${override.dependencyPath}`);
