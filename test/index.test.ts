@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeOverrides, getPackageJson, findUnusedOverrides, getNpmExplainOutput, parseExplainOutput } from '../src/index'
+import { analyzeOverrides, getPackageJson, findUnusedOverrides, getNpmExplainOutput, parseExplainOutput, formatAsUnifiedTree } from '../src/index'
 import * as path from 'path'
 
 describe('analyzeOverrides', () => {
@@ -30,7 +30,9 @@ describe('analyzeOverrides', () => {
     const sendOverride = result.find(override => override.name === 'send')
     expect(sendOverride).toBeDefined()
     expect(sendOverride?.version).toBe('0.19.1')
-    expect(sendOverride?.dependencyPath).toContain('send@0.19.1')
+    expect(sendOverride?.dependencyPaths).toBeDefined()
+    expect(sendOverride?.dependencyPaths.length).toBeGreaterThan(0)
+    expect(sendOverride?.dependencyPaths[0]).toContain('send@0.19.1')
   })
 })
 
@@ -85,7 +87,9 @@ describe('formatAsTree', () => {
     const overrides = analyzeOverrides(fixtureDir)
 
     expect(overrides.length).toBe(1)
-    expect(overrides[0].dependencyPath).toBe('send@0.19.1 > honkit@6.0.3')
+    expect(overrides[0].dependencyPaths).toBeDefined()
+    expect(overrides[0].dependencyPaths.length).toBeGreaterThan(0)
+    expect(overrides[0].dependencyPaths[0]).toContain('send@0.19.1')
   })
 
   it('should handle complex dependency paths', () => {
@@ -94,7 +98,9 @@ describe('formatAsTree', () => {
     const overrides = analyzeOverrides(fixtureDir)
 
     expect(overrides.length).toBeGreaterThan(0)
-    expect(overrides[0].dependencyPath).toContain(' > ')
+    expect(overrides[0].dependencyPaths).toBeDefined()
+    expect(overrides[0].dependencyPaths.length).toBeGreaterThan(0)
+    expect(overrides[0].dependencyPaths[0]).toContain(' > ')
   })
 })
 
@@ -137,8 +143,10 @@ describe('parseExplainOutput', () => {
     expect(result.length).toBeGreaterThan(0)
     expect(result[0]).toHaveProperty('name', 'send')
     expect(result[0]).toHaveProperty('version')
-    expect(result[0]).toHaveProperty('dependencyPath')
-    expect(result[0].dependencyPath).toContain('send@')
+    expect(result[0]).toHaveProperty('dependencyPaths')
+    expect(result[0].dependencyPaths).toBeDefined()
+    expect(result[0].dependencyPaths.length).toBeGreaterThan(0)
+    expect(result[0].dependencyPaths[0]).toContain('send@')
   })
 
   it('should return empty array for non-overridden packages', () => {
@@ -148,4 +156,42 @@ describe('parseExplainOutput', () => {
     expect(Array.isArray(result)).toBe(true)
     expect(result.length).toBe(0)
   })
+})
+
+describe('formatAsUnifiedTree', () => {
+  it('should create unified tree from multiple paths', () => {
+    const paths = [
+      'cheerio@1.0.0-rc.12 > @honkit/html@6.0.3 > @honkit/asciidoc@6.0.3 > honkit@6.0.3',
+      'cheerio@1.0.0-rc.12 > @honkit/html@6.0.3 > @honkit/markdown-legacy@6.0.3 > honkit@6.0.3'
+    ];
+
+    const result = formatAsUnifiedTree(paths);
+    
+    expect(result).toContain('cheerio@1.0.0-rc.12');
+    expect(result).toContain('@honkit/html@6.0.3');
+    expect(result).toContain('@honkit/asciidoc@6.0.3');
+    expect(result).toContain('@honkit/markdown-legacy@6.0.3');
+    
+    // Should show unified structure - @honkit/html should appear only once
+    const htmlMatches = result.match(/@honkit\/html@6\.0\.3/g);
+    expect(htmlMatches?.length).toBe(1);
+    
+    console.log('Unified tree output:');
+    console.log(result);
+  });
+
+  it('should handle single path correctly', () => {
+    const paths = ['send@0.19.1 > honkit@6.0.3'];
+    const result = formatAsUnifiedTree(paths);
+    
+    expect(result).toContain('send@0.19.1');
+    expect(result).toContain('honkit@6.0.3');
+  });
+
+  it('should handle empty paths array', () => {
+    const paths: string[] = [];
+    const result = formatAsUnifiedTree(paths);
+    
+    expect(result).toBe('');
+  });
 })

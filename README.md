@@ -67,8 +67,9 @@ $ echo $?
 
 ## How it works
 
-1. `npm-ls-overrides` executes `npm ls --all --json` to get the complete dependency tree
-2. It parses the output to find packages marked with `overridden: true`
-3. It reads `package.json` to get the defined overrides
-4. It compares the two lists to identify unused overrides
-5. Returns exit code 1 if any unused overrides are found
+1. `npm-ls-overrides` reads `package.json` to identify defined overrides
+2. It executes `npm explain <package> --json` for each override to get detailed dependency information
+3. It parses the output to find packages marked with `overridden: true`
+4. It builds a unified tree structure from all dependency paths to avoid duplicate nodes
+5. It compares used overrides with defined overrides to identify unused ones
+6. Returns exit code 1 if any unused overrides are found

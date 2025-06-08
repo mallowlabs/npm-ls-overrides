@@ -12,7 +12,7 @@ import * as fs from 'fs';
 export interface PackageOverride {
   name: string;
   version: string;
-  dependencyPath: string;
+  dependencyPaths: string[];
 }
 
 export interface UnusedOverride {
@@ -24,6 +24,11 @@ export interface PackageJson {
   name?: string;
   version?: string;
   overrides?: Record<string, string>;
+}
+
+export interface TreeNode {
+  name: string;
+  children: Map<string, TreeNode>;
 }
 
 /**
@@ -54,17 +59,17 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
   try {
     // Get package.json to find defined overrides
     const packageJson = getPackageJson(targetDir);
-    
+
     if (!packageJson.overrides) {
       return [];
     }
 
     // Get package names from overrides
     const packageNames = Object.keys(packageJson.overrides);
-    
+
     // Use npm explain to get detailed information about these packages
     const explainOutput = getNpmExplainOutput(targetDir, packageNames);
-    
+
     // Parse the output to find actually overridden packages
     return parseExplainOutput(explainOutput);
   } catch (error) {
@@ -107,31 +112,112 @@ export function findUnusedOverrides(targetDir: string, usedOverrides: PackageOve
 }
 
 /**
- * Format dependency path as a tree structure
+ * Format dependency paths as a unified tree structure
+ * @param dependencyPaths - Array of dependency path strings
+ * @returns Formatted unified tree structure
+ */
+export function formatAsUnifiedTree(dependencyPaths: string[]): string {
+  if (dependencyPaths.length === 0) {
+    return '';
+  }
+
+  // Build tree structure from all paths
+  const root = buildTreeFromPaths(dependencyPaths);
+  
+  // Format tree as string
+  return formatTreeNode(root, '', true);
+}
+
+/**
+ * Build tree structure from dependency paths
+ * @param dependencyPaths - Array of dependency path strings
+ * @returns Root tree node
+ */
+export function buildTreeFromPaths(dependencyPaths: string[]): TreeNode {
+  // Get the root package name from the first path
+  const rootPackage = dependencyPaths[0]?.split(' > ')[0] || '';
+  const root: TreeNode = {
+    name: rootPackage,
+    children: new Map()
+  };
+
+  // Add each path to the tree
+  for (const path of dependencyPaths) {
+    const packages = path.split(' > ');
+    if (packages.length > 1) {
+      // Skip the root package, start from dependents
+      addPathToTree(root, packages.slice(1));
+    }
+  }
+
+  return root;
+}
+
+/**
+ * Add a dependency path to the tree
+ * @param node - Current tree node
+ * @param pathSegments - Remaining path segments to add
+ */
+function addPathToTree(node: TreeNode, pathSegments: string[]): void {
+  if (pathSegments.length === 0) {
+    return;
+  }
+
+  const [currentPackage, ...remainingSegments] = pathSegments;
+  
+  if (!node.children.has(currentPackage)) {
+    node.children.set(currentPackage, {
+      name: currentPackage,
+      children: new Map()
+    });
+  }
+
+  const childNode = node.children.get(currentPackage)!;
+  addPathToTree(childNode, remainingSegments);
+}
+
+/**
+ * Format tree node as string with proper indentation
+ * @param node - Tree node to format
+ * @param prefix - Current indentation prefix
+ * @param isRoot - Whether this is the root node
+ * @returns Formatted string representation
+ */
+function formatTreeNode(node: TreeNode, prefix: string, isRoot: boolean): string {
+  const lines: string[] = [];
+  
+  if (isRoot) {
+    lines.push(node.name);
+  }
+
+  const children = Array.from(node.children.values());
+  
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    const isLast = i === children.length - 1;
+    const currentPrefix = isRoot ? ' - ' : prefix + (isLast ? ' - ' : ' - ');
+    const nextPrefix = isRoot ? '   ' : prefix + (isLast ? '   ' : '   ');
+    
+    lines.push(currentPrefix + child.name);
+    
+    if (child.children.size > 0) {
+      const childOutput = formatTreeNode(child, nextPrefix, false);
+      if (childOutput) {
+        lines.push(childOutput);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format dependency path as a tree structure (legacy function for single paths)
  * @param dependencyPath - The dependency path string (e.g., "send@0.19.1 > honkit@6.0.3")
  * @returns Formatted tree structure
  */
 function formatAsTree(dependencyPath: string): string {
-  const packages = dependencyPath.split(' > ');
-
-  if (packages.length <= 1) {
-    return packages[0] || '';
-  }
-
-  const lines: string[] = [];
-
-  // Add the root package (overridden package)
-  lines.push(packages[0]);
-
-  // Add dependent packages with tree structure
-  for (let i = 1; i < packages.length; i++) {
-    const indent = ' '.repeat((i - 1) * 2); // 2 spaces per level
-    const isLast = i === packages.length - 1;
-    const prefix = indent + (isLast ? ' - ' : ' ├ ');
-    lines.push(prefix + packages[i]);
-  }
-
-  return lines.join('\n');
+  return formatAsUnifiedTree([dependencyPath]);
 }
 
 /**
@@ -151,7 +237,7 @@ function main(): void {
   } else {
     console.log(`Found ${overrides.length} overridden package(s):`);
     overrides.forEach((override) => {
-      console.log(formatAsTree(override.dependencyPath));
+      console.log(formatAsUnifiedTree(override.dependencyPaths));
     });
   }
 
@@ -263,13 +349,13 @@ export function parseExplainOutput(explainOutput: NpmExplainOutput): PackageOver
 
   for (const packageInfo of explainOutput) {
     if (packageInfo.overridden === true) {
-      // Build dependency path from the dependents information
-      const dependencyPath = buildDependencyPath(packageInfo);
-      
+      // Build all dependency paths from the dependents information
+      const dependencyPaths = buildAllDependencyPaths(packageInfo);
+
       const override: PackageOverride = {
         name: packageInfo.name,
         version: packageInfo.version,
-        dependencyPath
+        dependencyPaths
       };
 
       overrides.push(override);
@@ -280,23 +366,63 @@ export function parseExplainOutput(explainOutput: NpmExplainOutput): PackageOver
 }
 
 /**
- * Build dependency path from npm explain package info
+ * Build all dependency paths from npm explain package info
  * @param packageInfo - Package information from npm explain
- * @returns Dependency path string
+ * @returns Array of dependency path strings
  */
-function buildDependencyPath(packageInfo: NpmExplainPackage): string {
-  const path: string[] = [];
-  
-  // Add the overridden package first
-  path.push(`${packageInfo.name}@${packageInfo.version}`);
-  
-  // Find the dependency chain through dependents
-  if (packageInfo.dependents && packageInfo.dependents.length > 0) {
-    const dependent = packageInfo.dependents[0]; // Take the first dependent
-    if (dependent.from && dependent.from.name) {
-      path.push(`${dependent.from.name}@${dependent.from.version || 'unknown'}`);
+function buildAllDependencyPaths(packageInfo: NpmExplainPackage): string[] {
+  const paths: string[] = [];
+
+  // Add the overridden package as the root
+  const rootPackage = `${packageInfo.name}@${packageInfo.version}`;
+
+  if (!packageInfo.dependents || packageInfo.dependents.length === 0) {
+    // No dependents, return just the package itself
+    return [rootPackage];
+  }
+
+  // Recursively build paths for each dependent
+  for (const dependent of packageInfo.dependents) {
+    const subPaths = buildDependentPaths(dependent, []);
+    for (const subPath of subPaths) {
+      // Create the full path: overridden package > dependent path
+      const fullPath = [rootPackage, ...subPath].join(' > ');
+      paths.push(fullPath);
     }
   }
-  
-  return path.join(' > ');
+
+  return paths;
+}
+
+/**
+ * Recursively build dependency paths from dependents
+ * @param dependent - The dependent information
+ * @param currentPath - Current path being built
+ * @returns Array of dependency paths
+ */
+function buildDependentPaths(dependent: NpmExplainDependent, currentPath: string[]): string[][] {
+  const paths: string[][] = [];
+
+  if (dependent.from && dependent.from.name) {
+    const packageName = `${dependent.from.name}@${dependent.from.version || 'unknown'}`;
+    const newPath = [...currentPath, packageName];
+
+    if (dependent.from.dependents && dependent.from.dependents.length > 0) {
+      // Continue recursively for nested dependents
+      for (const nestedDependent of dependent.from.dependents) {
+        const nestedPaths = buildDependentPaths(nestedDependent, newPath);
+        paths.push(...nestedPaths);
+      }
+    } else {
+      // This is a leaf node, add the path
+      paths.push(newPath);
+    }
+  } else {
+    // No from info, this might be a root dependency
+    if (currentPath.length > 0) {
+      paths.push(currentPath);
+    }
+  }
+
+  return paths;
 }
