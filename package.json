@@ -1,0 +1,14 @@
+{
+  "name": "npm-ls-overrides",
+  "version": "0.0.1",
+  "description": "A tool to list npm package dependencies in overrides.",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "mallowlabs",
+  "license": "MIT"
+}
