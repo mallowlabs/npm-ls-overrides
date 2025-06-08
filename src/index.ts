@@ -315,9 +315,8 @@ function formatTreeNode(node: TreeNode, prefix: string, isRoot: boolean): string
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
-    const isLast = i === children.length - 1;
-    const currentPrefix = isRoot ? ' - ' : prefix + (isLast ? ' - ' : ' - ');
-    const nextPrefix = isRoot ? '   ' : prefix + (isLast ? '   ' : '   ');
+    const currentPrefix = isRoot ? ' - ' : prefix + ' - ';
+    const nextPrefix = isRoot ? '   ' : prefix + '   ';
 
     // Format child name with rawSpec if available
     const childDisplayName = child.rawSpec ? `${child.name} (${child.rawSpec})` : child.name;
