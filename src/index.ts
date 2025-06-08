@@ -11,7 +11,7 @@ import * as path from 'path';
 export interface PackageOverride {
   name: string;
   version: string;
-  dependencies?: string[];
+  dependencyPath: string;
 }
 
 export interface NpmLsPackageInfo {
@@ -64,9 +64,9 @@ export function getNpmLsOutput(targetDir: string): NpmLsOutput {
  * Recursively traverse dependencies and find packages that are overridden
  * @param dependencies - The dependencies object from npm ls output
  * @param overrides - Array to collect found overrides
- * @param path - Current path in the dependency tree (for debugging)
+ * @param parentPath - Current path in the dependency tree (from root to current)
  */
-export function findOverriddenPackages(dependencies: Record<string, NpmLsPackageInfo> | undefined, overrides: PackageOverride[] = [], path: string = ''): PackageOverride[] {
+export function findOverriddenPackages(dependencies: Record<string, NpmLsPackageInfo> | undefined, overrides: PackageOverride[] = [], parentPath: string = ''): PackageOverride[] {
   if (!dependencies || typeof dependencies !== 'object') {
     return overrides;
   }
@@ -76,14 +76,23 @@ export function findOverriddenPackages(dependencies: Record<string, NpmLsPackage
       continue;
     }
 
-    const currentPath = path ? `${path} > ${packageName}` : packageName;
+    const currentPath = parentPath ? `${parentPath} > ${packageName}` : packageName;
 
     // Check if this package is overridden
     if (packageInfo.overridden === true) {
+      // Create dependency path from overridden package to root (reverse order)
+      const pathParts = currentPath.split(' > ');
+
+      // Add version to the overridden package name (first in reversed path)
+      const packageWithVersion = `${packageName}@${packageInfo.version || 'unknown'}`;
+      pathParts[pathParts.length - 1] = packageWithVersion;
+
+      const dependencyPath = pathParts.reverse().join(' > ');
+
       const override: PackageOverride = {
         name: packageName,
         version: packageInfo.version || 'unknown',
-        dependencies: packageInfo.dependencies ? Object.keys(packageInfo.dependencies) : undefined
+        dependencyPath
       };
 
       console.log(`Found overridden package: ${packageName}@${override.version} at path: ${currentPath}`);
@@ -141,10 +150,7 @@ function main(): void {
     console.log('\n=== Summary ===');
     console.log(`Found ${overrides.length} overridden package(s):`);
     overrides.forEach((override, index) => {
-      console.log(`${index + 1}. ${override.name}@${override.version}`);
-      if (override.dependencies && override.dependencies.length > 0) {
-        console.log(`   Dependencies: ${override.dependencies.join(', ')}`);
-      }
+      console.log(`${index + 1}. ${override.dependencyPath}`);
     });
   }
 }
