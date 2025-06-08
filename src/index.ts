@@ -2,6 +2,7 @@
 
 import { execSync } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * npm-ls-overrides
@@ -25,6 +26,17 @@ export interface NpmLsOutput {
   name?: string;
   version?: string;
   dependencies?: Record<string, NpmLsPackageInfo>;
+  overrides?: Record<string, string>;
+}
+
+export interface UnusedOverride {
+  name: string;
+  version: string;
+}
+
+export interface PackageJson {
+  name?: string;
+  version?: string;
   overrides?: Record<string, string>;
 }
 
@@ -117,6 +129,27 @@ export function findOverriddenPackages(
 }
 
 /**
+ * Read and parse package.json from the specified directory
+ * @param targetDir - The directory containing package.json
+ * @returns The parsed package.json content
+ */
+export function getPackageJson(targetDir: string): PackageJson {
+  try {
+    const absolutePath = path.resolve(targetDir);
+    const packageJsonPath = path.join(absolutePath, 'package.json');
+
+    if (!fs.existsSync(packageJsonPath)) {
+      throw new Error(`package.json not found in ${targetDir}`);
+    }
+
+    const content = fs.readFileSync(packageJsonPath, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    throw new Error(`Failed to read package.json from ${targetDir}: ${error}`);
+  }
+}
+
+/**
  * Main function to analyze npm package overrides
  */
 export function analyzeOverrides(targetDir: string = process.cwd()): PackageOverride[] {
@@ -133,6 +166,39 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
 }
 
 /**
+ * Find unused overrides by comparing package.json overrides with actual overridden packages
+ * @param targetDir - The directory to analyze
+ * @param usedOverrides - Array of packages that are actually overridden
+ * @returns Array of unused overrides
+ */
+export function findUnusedOverrides(targetDir: string, usedOverrides: PackageOverride[]): UnusedOverride[] {
+  try {
+    const packageJson = getPackageJson(targetDir);
+
+    if (!packageJson.overrides) {
+      return [];
+    }
+
+    const usedOverrideNames = new Set(usedOverrides.map(override => override.name));
+    const unusedOverrides: UnusedOverride[] = [];
+
+    for (const [packageName, version] of Object.entries(packageJson.overrides)) {
+      if (!usedOverrideNames.has(packageName)) {
+        unusedOverrides.push({
+          name: packageName,
+          version: version
+        });
+      }
+    }
+
+    return unusedOverrides;
+  } catch (error) {
+    console.error('Error finding unused overrides:', error);
+    return [];
+  }
+}
+
+/**
  * CLI entry point
  */
 function main(): void {
@@ -140,6 +206,9 @@ function main(): void {
   const targetDir = process.argv[2] || process.cwd();
 
   const overrides = analyzeOverrides(targetDir);
+  const unusedOverrides = findUnusedOverrides(targetDir, overrides);
+
+  let hasIssues = false;
 
   if (overrides.length === 0) {
     console.log('No overridden packages found.');
@@ -148,6 +217,18 @@ function main(): void {
     overrides.forEach((override, index) => {
       console.log(`${index + 1}. ${override.dependencyPath}`);
     });
+  }
+
+  if (unusedOverrides.length > 0) {
+    console.log(`\n⚠️  Found ${unusedOverrides.length} unused override(s):`);
+    unusedOverrides.forEach((override, index) => {
+      console.log(`${index + 1}. ${override.name}@${override.version} (not used in dependency tree)`);
+    });
+    hasIssues = true;
+  }
+
+  if (hasIssues) {
+    process.exit(1);
   }
 }
 

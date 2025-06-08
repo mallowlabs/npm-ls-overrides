@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeOverrides, getNpmLsOutput, findOverriddenPackages } from '../src/index'
+import { analyzeOverrides, getNpmLsOutput, findOverriddenPackages, getPackageJson, findUnusedOverrides } from '../src/index'
 import * as path from 'path'
 
 describe('analyzeOverrides', () => {
@@ -61,5 +61,50 @@ describe('getNpmLsOutput', () => {
 
     expect(typeof result).toBe('object')
     expect(result).toHaveProperty('name')
+  })
+})
+
+describe('getPackageJson', () => {
+  it('should read package.json from directory', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const result = getPackageJson(fixtureDir)
+
+    expect(typeof result).toBe('object')
+    expect(result).toHaveProperty('name')
+    expect(result).toHaveProperty('overrides')
+  })
+
+  it('should throw error for non-existent directory', () => {
+    const nonExistentDir = '/path/that/does/not/exist'
+
+    expect(() => {
+      getPackageJson(nonExistentDir)
+    }).toThrow()
+  })
+})
+
+describe('findUnusedOverrides', () => {
+  it('should find unused overrides', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/unused-example')
+    const npmLsOutput = getNpmLsOutput(fixtureDir)
+    const overrides = findOverriddenPackages(npmLsOutput.dependencies)
+    const unusedOverrides = findUnusedOverrides(fixtureDir, overrides)
+
+    expect(Array.isArray(unusedOverrides)).toBe(true)
+    expect(unusedOverrides.length).toBeGreaterThan(0)
+
+    const trimOverride = unusedOverrides.find(override => override.name === 'trim')
+    expect(trimOverride).toBeDefined()
+    expect(trimOverride?.version).toBe('0.0.3')
+  })
+
+  it('should return empty array when no unused overrides', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const npmLsOutput = getNpmLsOutput(fixtureDir)
+    const overrides = findOverriddenPackages(npmLsOutput.dependencies)
+    const unusedOverrides = findUnusedOverrides(fixtureDir, overrides)
+
+    expect(Array.isArray(unusedOverrides)).toBe(true)
+    expect(unusedOverrides.length).toBe(0)
   })
 })
