@@ -7,6 +7,12 @@
   "bin": {
     "npm-ls-overrides": "dist/index.js"
   },
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "README.md",
+    "package.json"
+  ],
   "directories": {
     "test": "test"
   },
@@ -16,16 +22,19 @@
     "dev": "ts-node src/index.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
+    "postinstall": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "author": "mallowlabs",
   "license": "MIT",
+  "dependencies": {
+    "typescript": "^5.8.3"
+  },
   "devDependencies": {
     "@types/node": "^22.15.30",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3",
     "vitest": "^3.2.2"
   }
 }
