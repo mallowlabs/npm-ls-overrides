@@ -37,6 +37,20 @@ describe('analyzeOverrides', () => {
     expect(sendOverride?.pathsWithRawSpecs.length).toBeGreaterThan(0)
     expect(sendOverride?.pathsWithRawSpecs[0]).toBeDefined()
   })
+
+  it('should work with npm alias overrides', async () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/alias-example')
+    const result = analyzeOverrides(fixtureDir)
+
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+
+    // Should find rollup package that was overridden with npm:@rollup/wasm-node
+    const rollupOverride = result.find(override => override.name === 'rollup')
+    expect(rollupOverride).toBeDefined()
+    expect(rollupOverride?.pathsWithRawSpecs).toBeDefined()
+    expect(rollupOverride?.pathsWithRawSpecs.length).toBeGreaterThan(0)
+  })
 })
 
 describe('getPackageJson', () => {

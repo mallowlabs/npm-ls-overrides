@@ -66,11 +66,26 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
       return [];
     }
 
-    // Get package names from overrides
+    // Get package names from overrides, handling npm: alias syntax
     const packageNames = Object.keys(packageJson.overrides);
+    const explainPackageNames: string[] = [];
+
+    for (const packageName of packageNames) {
+      const overrideValue = packageJson.overrides[packageName];
+      if (overrideValue.startsWith('npm:')) {
+        // Extract actual package name from npm:@scope/package@version syntax
+        // Example: "npm:@rollup/wasm-node@^4.22.5" -> "@rollup/wasm-node"
+        const npmPart = overrideValue.substring(4); // Remove "npm:"
+        const atIndex = npmPart.lastIndexOf('@');
+        const actualPackageName = atIndex > 0 ? npmPart.substring(0, atIndex) : npmPart;
+        explainPackageNames.push(actualPackageName);
+      } else {
+        explainPackageNames.push(packageName);
+      }
+    }
 
     // Use npm explain to get detailed information about these packages
-    const explainOutput = getNpmExplainOutput(targetDir, packageNames);
+    const explainOutput = getNpmExplainOutput(targetDir, explainPackageNames);
 
     // Parse the output to find actually overridden packages
     return parseExplainOutput(explainOutput);
