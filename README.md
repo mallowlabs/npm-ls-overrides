@@ -33,8 +33,6 @@ If no directory is specified, the current directory is used.
 
 ```bash
 $ npx npm-ls-overrides
-Analyzing npm package overrides in: .
-Found overridden package: send@0.19.1 at path: honkit > send
 Found 1 overridden package(s):
 1. send@0.19.1 > honkit@6.0.3
 ```
@@ -55,8 +53,6 @@ Found 1 overridden package(s):
 
 ```bash
 $ npx npm-ls-overrides
-Analyzing npm package overrides in: .
-Found overridden package: send@0.19.1 at path: honkit > send
 Found 1 overridden package(s):
 1. send@0.19.1 > honkit@6.0.3
 

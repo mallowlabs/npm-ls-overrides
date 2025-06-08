@@ -115,7 +115,6 @@ export function findOverriddenPackages(
         dependencyPath
       };
 
-      console.log(`Found overridden package: ${packageName}@${override.version} at path: ${currentPathString}`);
       overrides.push(override);
     }
 
@@ -154,7 +153,6 @@ export function getPackageJson(targetDir: string): PackageJson {
  */
 export function analyzeOverrides(targetDir: string = process.cwd()): PackageOverride[] {
   try {
-    console.log(`Analyzing npm package overrides in: ${targetDir}`);
     const npmLsOutput = getNpmLsOutput(targetDir);
 
     // Find all overridden packages in the dependency tree
