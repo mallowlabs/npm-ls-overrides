@@ -292,15 +292,6 @@ function addPathToTreeWithRawSpec(node: TreeNode, pathSegments: string[], rawSpe
 }
 
 /**
- * Add a dependency path to the tree
- * @param node - Current tree node
- * @param pathSegments - Remaining path segments to add
- */
-function addPathToTree(node: TreeNode, pathSegments: string[]): void {
-  addPathToTreeWithRawSpec(node, pathSegments, '');
-}
-
-/**
  * Format tree node as string with proper indentation and rawSpec information
  * @param node - Tree node to format
  * @param prefix - Current indentation prefix
@@ -335,16 +326,6 @@ function formatTreeNode(node: TreeNode, prefix: string, isRoot: boolean): string
   }
 
   return lines.join('\n');
-}
-
-/**
- * Format dependency path as a tree structure (legacy function for single paths)
- * @param dependencyPath - The dependency path string (e.g., "send@0.19.1 > honkit@6.0.3")
- * @param rawSpec - Optional rawSpec value
- * @returns Formatted tree structure
- */
-function formatAsTree(dependencyPath: string, rawSpec?: string): string {
-  return formatAsUnifiedTree([dependencyPath], rawSpec ? [rawSpec] : []);
 }
 
 /**
@@ -529,16 +510,6 @@ function buildAllDependencyPathsWithRawSpecs(packageInfo: NpmExplainPackage): { 
 }
 
 /**
- * Build all dependency paths from npm explain package info
- * @param packageInfo - Package information from npm explain
- * @returns Array of dependency path strings
- */
-function buildAllDependencyPaths(packageInfo: NpmExplainPackage): string[] {
-  const { dependencyPaths } = buildAllDependencyPathsWithRawSpecs(packageInfo);
-  return dependencyPaths;
-}
-
-/**
  * Recursively build dependency paths with rawSpec chain from dependents
  * @param dependent - The dependent information
  * @param currentPath - Current path being built with rawSpec information
@@ -572,55 +543,4 @@ function buildDependentPathsWithRawSpecChain(dependent: NpmExplainDependent, cur
   }
 
   return results;
-}
-
-/**
- * Recursively build dependency paths with rawSpec from dependents
- * @param dependent - The dependent information
- * @param currentPath - Current path being built
- * @param currentRawSpecs - Current rawSpec values being built
- * @returns Array of objects containing dependency paths and rawSpecs
- */
-function buildDependentPathsWithRawSpecs(dependent: NpmExplainDependent, currentPath: string[], currentRawSpecs: string[]): Array<{ path: string[], rawSpec: string }> {
-  const results: Array<{ path: string[], rawSpec: string }> = [];
-
-  if (dependent.from && dependent.from.name) {
-    const packageName = `${dependent.from.name}@${dependent.from.version || 'unknown'}`;
-    const newPath = [...currentPath, packageName];
-
-    if (dependent.from.dependents && dependent.from.dependents.length > 0) {
-      // Continue recursively for nested dependents
-      for (const nestedDependent of dependent.from.dependents) {
-        const nestedResults = buildDependentPathsWithRawSpecs(nestedDependent, newPath, currentRawSpecs);
-        results.push(...nestedResults);
-      }
-    } else {
-      // This is a leaf node, add the path with rawSpec
-      results.push({
-        path: newPath,
-        rawSpec: dependent.rawSpec || dependent.spec || ''
-      });
-    }
-  } else {
-    // No from info, this might be a root dependency
-    if (currentPath.length > 0) {
-      results.push({
-        path: currentPath,
-        rawSpec: dependent.rawSpec || dependent.spec || ''
-      });
-    }
-  }
-
-  return results;
-}
-
-/**
- * Recursively build dependency paths from dependents
- * @param dependent - The dependent information
- * @param currentPath - Current path being built
- * @returns Array of dependency paths
- */
-function buildDependentPaths(dependent: NpmExplainDependent, currentPath: string[]): string[][] {
-  const results = buildDependentPathsWithRawSpecs(dependent, currentPath, []);
-  return results.map(result => result.path);
 }
