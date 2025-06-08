@@ -13,7 +13,7 @@ A tool to analyze npm package dependencies and detect both used and unused overr
 ## Usage
 
 ```bash
-$ npx npm-ls-overrides [directory]
+$ npx github:mallowlabs/npm-ls-overrides [directory]
 ```
 
 If no directory is specified, the current directory is used.
