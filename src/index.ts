@@ -197,6 +197,34 @@ export function findUnusedOverrides(targetDir: string, usedOverrides: PackageOve
 }
 
 /**
+ * Format dependency path as a tree structure
+ * @param dependencyPath - The dependency path string (e.g., "send@0.19.1 > honkit@6.0.3")
+ * @returns Formatted tree structure
+ */
+function formatAsTree(dependencyPath: string): string {
+  const packages = dependencyPath.split(' > ');
+
+  if (packages.length <= 1) {
+    return packages[0] || '';
+  }
+
+  const lines: string[] = [];
+
+  // Add the root package (overridden package)
+  lines.push(packages[0]);
+
+  // Add dependent packages with tree structure
+  for (let i = 1; i < packages.length; i++) {
+    const indent = ' '.repeat((i - 1) * 2); // 2 spaces per level
+    const isLast = i === packages.length - 1;
+    const prefix = indent + (isLast ? ' - ' : ' ├ ');
+    lines.push(prefix + packages[i]);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * CLI entry point
  */
 function main(): void {
@@ -212,15 +240,15 @@ function main(): void {
     console.log('No overridden packages found.');
   } else {
     console.log(`Found ${overrides.length} overridden package(s):`);
-    overrides.forEach((override, index) => {
-      console.log(`${index + 1}. ${override.dependencyPath}`);
+    overrides.forEach((override) => {
+      console.log(formatAsTree(override.dependencyPath));
     });
   }
 
   if (unusedOverrides.length > 0) {
     console.log(`\n⚠️  Found ${unusedOverrides.length} unused override(s):`);
-    unusedOverrides.forEach((override, index) => {
-      console.log(`${index + 1}. ${override.name}@${override.version} (not used in dependency tree)`);
+    unusedOverrides.forEach((override) => {
+      console.log(`${override.name}@${override.version} (not used in dependency tree)`);
     });
     hasIssues = true;
   }

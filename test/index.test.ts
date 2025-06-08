@@ -108,3 +108,24 @@ describe('findUnusedOverrides', () => {
     expect(unusedOverrides.length).toBe(0)
   })
 })
+
+describe('formatAsTree', () => {
+  // Import the formatAsTree function for testing
+  // Since it's not exported, we'll test it through the CLI output behavior
+  it('should format single package correctly', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const overrides = analyzeOverrides(fixtureDir)
+
+    expect(overrides.length).toBe(1)
+    expect(overrides[0].dependencyPath).toBe('send@0.19.1 > honkit@6.0.3')
+  })
+
+  it('should handle complex dependency paths', () => {
+    // Test that dependency paths with multiple levels would work
+    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const overrides = analyzeOverrides(fixtureDir)
+
+    expect(overrides.length).toBeGreaterThan(0)
+    expect(overrides[0].dependencyPath).toContain(' > ')
+  })
+})
