@@ -64,9 +64,13 @@ export function getNpmLsOutput(targetDir: string): NpmLsOutput {
  * Recursively traverse dependencies and find packages that are overridden
  * @param dependencies - The dependencies object from npm ls output
  * @param overrides - Array to collect found overrides
- * @param parentPath - Current path in the dependency tree (from root to current)
+ * @param parentPath - Array of parent packages with their version info
  */
-export function findOverriddenPackages(dependencies: Record<string, NpmLsPackageInfo> | undefined, overrides: PackageOverride[] = [], parentPath: string = ''): PackageOverride[] {
+export function findOverriddenPackages(
+  dependencies: Record<string, NpmLsPackageInfo> | undefined,
+  overrides: PackageOverride[] = [],
+  parentPath: Array<{name: string, version: string}> = []
+): PackageOverride[] {
   if (!dependencies || typeof dependencies !== 'object') {
     return overrides;
   }
@@ -76,18 +80,22 @@ export function findOverriddenPackages(dependencies: Record<string, NpmLsPackage
       continue;
     }
 
-    const currentPath = parentPath ? `${parentPath} > ${packageName}` : packageName;
+    // Create current package info with version
+    const currentPackage = {
+      name: packageName,
+      version: packageInfo.version || 'unknown'
+    };
+
+    const currentPath = [...parentPath, currentPackage];
+    const currentPathString = currentPath.map(p => p.name).join(' > ');
 
     // Check if this package is overridden
     if (packageInfo.overridden === true) {
-      // Create dependency path from overridden package to root (reverse order)
-      const pathParts = currentPath.split(' > ');
-
-      // Add version to the overridden package name (first in reversed path)
-      const packageWithVersion = `${packageName}@${packageInfo.version || 'unknown'}`;
-      pathParts[pathParts.length - 1] = packageWithVersion;
-
-      const dependencyPath = pathParts.reverse().join(' > ');
+      // Create dependency path from overridden package to root (reverse order) with versions
+      const dependencyPath = currentPath
+        .map(p => `${p.name}@${p.version}`)
+        .reverse()
+        .join(' > ');
 
       const override: PackageOverride = {
         name: packageName,
@@ -95,7 +103,7 @@ export function findOverriddenPackages(dependencies: Record<string, NpmLsPackage
         dependencyPath
       };
 
-      console.log(`Found overridden package: ${packageName}@${override.version} at path: ${currentPath}`);
+      console.log(`Found overridden package: ${packageName}@${override.version} at path: ${currentPathString}`);
       overrides.push(override);
     }
 

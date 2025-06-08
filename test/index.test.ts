@@ -32,7 +32,7 @@ describe('analyzeOverrides', () => {
     const sendOverride = overrides.find(override => override.name === 'send')
     expect(sendOverride).toBeDefined()
     expect(sendOverride?.version).toBe('0.19.1')
-    expect(sendOverride?.dependencyPath).toBe('send@0.19.1 > honkit')
+    expect(sendOverride?.dependencyPath).toBe('send@0.19.1 > honkit@6.0.3')
   })
 })
 
