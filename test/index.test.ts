@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { analyzeOverrides, getNpmLsOutput, findOverriddenPackages } from '../src/index'
 import * as path from 'path'
-import * as fs from 'fs'
 
 describe('analyzeOverrides', () => {
   it('should return an empty array initially', () => {
@@ -18,12 +17,12 @@ describe('analyzeOverrides', () => {
     const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
     const result = analyzeOverrides(fixtureDir)
     expect(Array.isArray(result)).toBe(true)
-  })
+    })
 
-  it('should find overridden packages from npm-ls.json fixture', () => {
-    // Read the fixture npm-ls.json file and test the findOverriddenPackages function directly
-    const npmLsJsonPath = path.resolve(__dirname, 'fixtures/honkit-example/npm-ls.json')
-    const npmLsOutput = JSON.parse(fs.readFileSync(npmLsJsonPath, 'utf8'))
+  it('should find overridden packages from npm ls execution', () => {
+    // Use the test fixture directory and execute npm ls directly
+    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const npmLsOutput = getNpmLsOutput(fixtureDir)
 
     const overrides = findOverriddenPackages(npmLsOutput.dependencies)
 

@@ -14,12 +14,26 @@ export interface PackageOverride {
   dependencies?: string[];
 }
 
+export interface NpmLsPackageInfo {
+  version?: string;
+  resolved?: string;
+  overridden?: boolean;
+  dependencies?: Record<string, NpmLsPackageInfo>;
+}
+
+export interface NpmLsOutput {
+  name?: string;
+  version?: string;
+  dependencies?: Record<string, NpmLsPackageInfo>;
+  overrides?: Record<string, string>;
+}
+
 /**
  * Execute npm ls --all --json in the specified directory and return the output
  * @param targetDir - The directory to execute npm ls in
  * @returns The JSON output from npm ls command
  */
-export function getNpmLsOutput(targetDir: string): any {
+export function getNpmLsOutput(targetDir: string): NpmLsOutput {
   try {
     const absolutePath = path.resolve(targetDir);
     const command = 'npm ls --all --json';
@@ -52,7 +66,7 @@ export function getNpmLsOutput(targetDir: string): any {
  * @param overrides - Array to collect found overrides
  * @param path - Current path in the dependency tree (for debugging)
  */
-export function findOverriddenPackages(dependencies: any, overrides: PackageOverride[] = [], path: string = ''): PackageOverride[] {
+export function findOverriddenPackages(dependencies: Record<string, NpmLsPackageInfo> | undefined, overrides: PackageOverride[] = [], path: string = ''): PackageOverride[] {
   if (!dependencies || typeof dependencies !== 'object') {
     return overrides;
   }
@@ -62,15 +76,14 @@ export function findOverriddenPackages(dependencies: any, overrides: PackageOver
       continue;
     }
 
-    const info = packageInfo as any;
     const currentPath = path ? `${path} > ${packageName}` : packageName;
 
     // Check if this package is overridden
-    if (info.overridden === true) {
+    if (packageInfo.overridden === true) {
       const override: PackageOverride = {
         name: packageName,
-        version: info.version || 'unknown',
-        dependencies: info.dependencies ? Object.keys(info.dependencies) : undefined
+        version: packageInfo.version || 'unknown',
+        dependencies: packageInfo.dependencies ? Object.keys(packageInfo.dependencies) : undefined
       };
 
       console.log(`Found overridden package: ${packageName}@${override.version} at path: ${currentPath}`);
@@ -78,8 +91,8 @@ export function findOverriddenPackages(dependencies: any, overrides: PackageOver
     }
 
     // Recursively check nested dependencies
-    if (info.dependencies) {
-      findOverriddenPackages(info.dependencies, overrides, currentPath);
+    if (packageInfo.dependencies) {
+      findOverriddenPackages(packageInfo.dependencies, overrides, currentPath);
     }
   }
 
