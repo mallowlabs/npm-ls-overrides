@@ -42,6 +42,30 @@ send@0.19.1
 
 The `(^0.17.2)` shows the original version specification that was overridden. This helps you verify whether you're overriding to an older version that might introduce security or compatibility issues.
 
+### npm Alias Override
+
+When using npm aliases, the tool displays them in the format `alias>actual-package@version`:
+
+```json:package.json
+{
+  "dependencies": {
+    "vite": "^6.3.5"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@^4.22.5"
+  }
+}
+```
+
+```bash
+$ npx npm-ls-overrides
+Found 1 overridden package(s):
+rollup>@rollup/wasm-node@4.42.0
+ - vite@6.3.5 (^4.34.9)
+```
+
+The `rollup>@rollup/wasm-node@4.42.0` format clearly shows that `rollup` is aliased to `@rollup/wasm-node` package.
+
 ### Unused Override
 
 ```json:package.json

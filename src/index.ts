@@ -14,6 +14,7 @@ export interface PackageOverride {
   version: string;
   dependencyPaths: string[];
   pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>>; // Each path as array of segments with rawSpec
+  aliasedFrom?: string; // Original package name if this is an alias (e.g., "rollup" for "@rollup/wasm-node")
 }
 
 export interface UnusedOverride {
@@ -69,6 +70,7 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
     // Get package names from overrides, handling npm: alias syntax
     const packageNames = Object.keys(packageJson.overrides);
     const explainPackageNames: string[] = [];
+    const aliasMap = new Map<string, string>(); // Map alias name to actual package name
 
     for (const packageName of packageNames) {
       const overrideValue = packageJson.overrides[packageName];
@@ -79,6 +81,8 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
         const atIndex = npmPart.lastIndexOf('@');
         const actualPackageName = atIndex > 0 ? npmPart.substring(0, atIndex) : npmPart;
         explainPackageNames.push(actualPackageName);
+        // For npm aliases, map alias name to actual package name
+        aliasMap.set(packageName, actualPackageName); // rollup -> @rollup/wasm-node
       } else {
         explainPackageNames.push(packageName);
       }
@@ -88,7 +92,9 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
     const explainOutput = getNpmExplainOutput(targetDir, explainPackageNames);
 
     // Parse the output to find actually overridden packages
-    return parseExplainOutput(explainOutput);
+    const overrides = parseExplainOutput(explainOutput, aliasMap);
+    
+    return overrides;
   } catch (error) {
     console.error('Error analyzing overrides:', error);
     return [];
@@ -450,21 +456,29 @@ export function getNpmExplainOutput(targetDir: string, packageNames: string[]): 
 /**
  * Parse npm explain output to find overridden packages
  * @param explainOutput - The output from npm explain command
+ * @param aliasMap - Map of alias names to actual package names
  * @returns Array of package overrides
  */
-export function parseExplainOutput(explainOutput: NpmExplainOutput): PackageOverride[] {
+export function parseExplainOutput(explainOutput: NpmExplainOutput, aliasMap?: Map<string, string>): PackageOverride[] {
   const overrides: PackageOverride[] = [];
 
   for (const packageInfo of explainOutput) {
     if (packageInfo.overridden === true) {
+      // Check if this package is aliased (npm explain returns alias name in packageInfo.name)
+      const actualPackageName = aliasMap?.get(packageInfo.name);
+
       // Build all dependency paths from the dependents information
-      const { dependencyPaths, pathsWithRawSpecs } = buildAllDependencyPathsWithRawSpecs(packageInfo);
+      const { dependencyPaths, pathsWithRawSpecs } = buildAllDependencyPathsWithRawSpecs(
+        packageInfo, 
+        actualPackageName ? { aliasName: packageInfo.name, actualName: actualPackageName } : undefined
+      );
 
       const override: PackageOverride = {
         name: packageInfo.name,
         version: packageInfo.version,
         dependencyPaths,
-        pathsWithRawSpecs
+        pathsWithRawSpecs,
+        aliasedFrom: actualPackageName ? packageInfo.name : undefined
       };
 
       overrides.push(override);
@@ -477,14 +491,17 @@ export function parseExplainOutput(explainOutput: NpmExplainOutput): PackageOver
 /**
  * Build all dependency paths with rawSpec information from npm explain package info
  * @param packageInfo - Package information from npm explain
+ * @param aliasInfo - Alias information if this is an npm alias
  * @returns Object containing dependency paths and paths with rawSpec information
  */
-function buildAllDependencyPathsWithRawSpecs(packageInfo: NpmExplainPackage): { dependencyPaths: string[], pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>> } {
+function buildAllDependencyPathsWithRawSpecs(packageInfo: NpmExplainPackage, aliasInfo?: { aliasName: string; actualName: string }): { dependencyPaths: string[], pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>> } {
   const paths: string[] = [];
   const pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>> = [];
 
-  // Add the overridden package as the root
-  const rootPackage = `${packageInfo.name}@${packageInfo.version}`;
+  // Add the overridden package as the root - use alias format if aliased
+  const rootPackage = aliasInfo 
+    ? `${aliasInfo.aliasName}>${aliasInfo.actualName}@${packageInfo.version}`
+    : `${packageInfo.name}@${packageInfo.version}`;
 
   if (!packageInfo.dependents || packageInfo.dependents.length === 0) {
     // No dependents, return just the package itself
