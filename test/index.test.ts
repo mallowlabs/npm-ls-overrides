@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeOverrides, getPackageJson, findUnusedOverrides, getNpmExplainOutput, parseExplainOutput, formatAsUnifiedTree, formatAsUnifiedTreeFromPathsWithRawSpecs } from '../src/index'
+import { analyzeOverrides, getPackageJson, findUnusedOverrides, formatAsUnifiedTree, formatAsUnifiedTreeFromPathsWithRawSpecs } from '../src/index'
+import { getNpmExplainOutput, parseExplainOutput } from '../src/npm'
 import * as path from 'path'
 
 describe('analyzeOverrides', () => {
