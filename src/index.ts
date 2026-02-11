@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { analyzeNpmOverrides } from './npm';
