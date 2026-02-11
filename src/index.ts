@@ -106,10 +106,6 @@ function main(): void {
   const targetDir = process.argv[2] || process.cwd();
 
   const overrides = analyzeOverrides(targetDir);
-  const unusedOverrides = findUnusedOverrides(targetDir, overrides);
-
-  let hasIssues = false;
-
   if (overrides.length === 0) {
     console.log('No overridden packages found.');
   } else {
@@ -119,6 +115,8 @@ function main(): void {
     });
   }
 
+  let hasIssues = false;
+  const unusedOverrides = findUnusedOverrides(targetDir, overrides);
   if (unusedOverrides.length > 0) {
     console.log(`\n⚠️  Found ${unusedOverrides.length} unused override(s):`);
     unusedOverrides.forEach((override) => {
