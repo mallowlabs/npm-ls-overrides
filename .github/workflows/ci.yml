@@ -15,17 +15,26 @@ jobs:
       with:
         node-version-file: '/.node-version'
         cache: 'npm'
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10
     - name: Install dependencies
       run: npm ci
-    - name: Install dependencies for test fixtures (honkit-example)
+    - name: Install dependencies for test fixtures (npm/honkit-example)
       run: npm ci
-      working-directory: test/fixtures/honkit-example
-    - name: Install dependencies for test fixtures (unused-example)
+      working-directory: test/fixtures/npm/honkit-example
+    - name: Install dependencies for test fixtures (npm/unused-example)
       run: npm ci
-      working-directory: test/fixtures/unused-example
-    - name: Install dependencies for test fixtures (alias-example)
+      working-directory: test/fixtures/npm/unused-example
+    - name: Install dependencies for test fixtures (npm/alias-example)
       run: npm ci
-      working-directory: test/fixtures/alias-example
+      working-directory: test/fixtures/npm/alias-example
+    - name: Install dependencies for test fixtures (pnpm/honkit-example)
+      run: pnpm install
+      working-directory: test/fixtures/pnpm/honkit-example
+    - name: Install dependencies for test fixtures (pnpm/unused-example)
+      run: pnpm install
+      working-directory: test/fixtures/pnpm/unused-example
 
     - name: Run build
       run: npm run build

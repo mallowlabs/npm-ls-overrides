@@ -16,14 +16,22 @@ describe('analyzeOverrides', () => {
   })
 
   it('should work with test fixture directory', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const result = analyzeOverrides(fixtureDir)
     expect(Array.isArray(result)).toBe(true)
   })
 
+  it('should work with pnpm test fixture directory', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/honkit-example')
+    const result = analyzeOverrides(fixtureDir)
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0].name).toBe('send')
+  })
+
   it('should find overridden packages from npm explain execution', () => {
     // Use the test fixture directory
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const result = analyzeOverrides(fixtureDir)
 
     expect(result.length).toBeGreaterThan(0)
@@ -41,7 +49,7 @@ describe('analyzeOverrides', () => {
   })
 
   it('should work with npm alias overrides', async () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/alias-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/alias-example')
     const result = analyzeOverrides(fixtureDir)
 
     expect(Array.isArray(result)).toBe(true)
@@ -57,7 +65,7 @@ describe('analyzeOverrides', () => {
 
 describe('getPackageJson', () => {
   it('should read package.json from directory', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const result = getPackageJson(fixtureDir)
 
     expect(typeof result).toBe('object')
@@ -76,7 +84,20 @@ describe('getPackageJson', () => {
 
 describe('findUnusedOverrides', () => {
   it('should find unused overrides', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/unused-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/unused-example')
+    const overrides = analyzeOverrides(fixtureDir)
+    const unusedOverrides = findUnusedOverrides(fixtureDir, overrides)
+
+    expect(Array.isArray(unusedOverrides)).toBe(true)
+    expect(unusedOverrides.length).toBeGreaterThan(0)
+
+    const trimOverride = unusedOverrides.find(override => override.name === 'trim')
+    expect(trimOverride).toBeDefined()
+    expect(trimOverride?.version).toBe('0.0.3')
+  })
+
+  it('should find unused overrides in pnpm', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/unused-example')
     const overrides = analyzeOverrides(fixtureDir)
     const unusedOverrides = findUnusedOverrides(fixtureDir, overrides)
 
@@ -89,7 +110,7 @@ describe('findUnusedOverrides', () => {
   })
 
   it('should return empty array when no unused overrides', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const overrides = analyzeOverrides(fixtureDir)
     const unusedOverrides = findUnusedOverrides(fixtureDir, overrides)
 
@@ -102,7 +123,7 @@ describe('formatAsTree', () => {
   // Import the formatAsTree function for testing
   // Since it's not exported, we'll test it through the CLI output behavior
   it('should format single package correctly', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const overrides = analyzeOverrides(fixtureDir)
 
     expect(overrides.length).toBe(1)
@@ -113,7 +134,7 @@ describe('formatAsTree', () => {
 
   it('should handle complex dependency paths', () => {
     // Test that dependency paths with multiple levels would work
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const overrides = analyzeOverrides(fixtureDir)
 
     expect(overrides.length).toBeGreaterThan(0)
@@ -125,7 +146,7 @@ describe('formatAsTree', () => {
 
 describe('getNpmExplainOutput', () => {
   it('should execute npm explain and return JSON output', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const result = getNpmExplainOutput(fixtureDir, ['send'])
 
     expect(Array.isArray(result)).toBe(true)
@@ -136,7 +157,7 @@ describe('getNpmExplainOutput', () => {
   })
 
   it('should return empty array for non-existent packages', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const result = getNpmExplainOutput(fixtureDir, ['nonexistent-package'])
 
     expect(Array.isArray(result)).toBe(true)
@@ -144,7 +165,7 @@ describe('getNpmExplainOutput', () => {
   })
 
   it('should return empty array for empty package list', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const result = getNpmExplainOutput(fixtureDir, [])
 
     expect(Array.isArray(result)).toBe(true)
@@ -154,7 +175,7 @@ describe('getNpmExplainOutput', () => {
 
 describe('parseExplainOutput', () => {
   it('should parse npm explain output and find overridden packages', () => {
-    const fixtureDir = path.resolve(__dirname, 'fixtures/honkit-example')
+    const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const explainOutput = getNpmExplainOutput(fixtureDir, ['send'])
     const result = parseExplainOutput(explainOutput)
 
