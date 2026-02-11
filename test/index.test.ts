@@ -96,6 +96,19 @@ describe('findUnusedOverrides', () => {
     expect(trimOverride?.version).toBe('0.0.3')
   })
 
+  it('should find unused overrides in pnpm', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/unused-example')
+    const overrides = analyzeOverrides(fixtureDir)
+    const unusedOverrides = findUnusedOverrides(fixtureDir, overrides)
+
+    expect(Array.isArray(unusedOverrides)).toBe(true)
+    expect(unusedOverrides.length).toBeGreaterThan(0)
+
+    const trimOverride = unusedOverrides.find(override => override.name === 'trim')
+    expect(trimOverride).toBeDefined()
+    expect(trimOverride?.version).toBe('0.0.3')
+  })
+
   it('should return empty array when no unused overrides', () => {
     const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
     const overrides = analyzeOverrides(fixtureDir)
