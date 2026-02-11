@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatAsUnifiedTree, buildTreeFromPaths } from '../src/index'
+import { formatAsUnifiedTree, buildTreeFromPaths } from '../src/tree'
 
 // Test the unified tree formatting with complex paths
 describe('Unified Tree Formatting', () => {
