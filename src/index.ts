@@ -3,6 +3,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { analyzeNpmOverrides } from './npm';
+import { analyzePnpmOverrides } from './pnpm';
 import { formatAsUnifiedTreeFromPathsWithRawSpecs } from './tree';
 
 /**
@@ -51,13 +52,20 @@ export function getPackageJson(targetDir: string): PackageJson {
 }
 
 /**
- * Main function to analyze npm package overrides
+ * Main function to analyze package overrides
  */
 export function analyzeOverrides(targetDir: string = process.cwd()): PackageOverride[] {
   try {
     // Get package.json to find defined overrides
     const packageJson = getPackageJson(targetDir);
 
+    // Detect package manager
+    const absolutePath = path.resolve(targetDir);
+    if (fs.existsSync(path.join(absolutePath, 'pnpm-lock.yaml'))) {
+      return analyzePnpmOverrides(targetDir, packageJson);
+    }
+
+    // Default to npm
     return analyzeNpmOverrides(targetDir, packageJson);
   } catch (error) {
     console.error('Error analyzing overrides:', error);

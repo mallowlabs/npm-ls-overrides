@@ -21,6 +21,14 @@ describe('analyzeOverrides', () => {
     expect(Array.isArray(result)).toBe(true)
   })
 
+  it('should work with pnpm test fixture directory', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/honkit-example')
+    const result = analyzeOverrides(fixtureDir)
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0].name).toBe('send')
+  })
+
   it('should find overridden packages from npm explain execution', () => {
     // Use the test fixture directory
     const fixtureDir = path.resolve(__dirname, 'fixtures/npm/honkit-example')
