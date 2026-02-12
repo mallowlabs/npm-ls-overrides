@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { analyzeOverrides, getPackageJson, findUnusedOverrides } from '../src/index'
-import { getNpmExplainOutput, parseExplainOutput } from '../src/npm'
+import { analyzePnpmOverrides } from '../src/pnpm'
+import { getNpmExplainOutput, parseExplainOutput, NpmExplainOutput } from '../src/npm'
 import { formatAsUnifiedTree, formatAsUnifiedTreeFromPathsWithRawSpecs } from '../src/tree'
 import * as path from 'path'
 
@@ -24,6 +25,25 @@ describe('analyzeOverrides', () => {
   it('should work with pnpm test fixture directory', () => {
     const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/honkit-example')
     const result = analyzeOverrides(fixtureDir)
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0].name).toBe('send')
+  })
+
+  it('should work with pnpm.overrides in package.json', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/honkit-example')
+    const packageJson = getPackageJson(fixtureDir)
+    
+    // Move overrides to pnpm.overrides
+    const pnpmPackageJson = {
+      ...packageJson,
+      pnpm: {
+        overrides: packageJson.overrides
+      },
+      overrides: undefined
+    }
+
+    const result = analyzePnpmOverrides(fixtureDir, pnpmPackageJson)
     expect(Array.isArray(result)).toBe(true)
     expect(result.length).toBeGreaterThan(0)
     expect(result[0].name).toBe('send')
@@ -107,6 +127,25 @@ describe('findUnusedOverrides', () => {
     const trimOverride = unusedOverrides.find(override => override.name === 'trim')
     expect(trimOverride).toBeDefined()
     expect(trimOverride?.version).toBe('0.0.3')
+  })
+
+  it('should find unused overrides in pnpm.overrides', () => {
+    const fixtureDir = path.resolve(__dirname, 'fixtures/pnpm/unused-example')
+    // Mock the unused scenario for pnpm.overrides
+    const usedOverrides: PackageOverride[] = [] // No overrides used
+    
+    const pnpmPackageJson: PackageJson = {
+      pnpm: {
+        overrides: { 'unused-pkg': '1.0.0' }
+      }
+    }
+    
+    const unusedOverrides = findUnusedOverrides(fixtureDir, usedOverrides, pnpmPackageJson)
+
+    expect(Array.isArray(unusedOverrides)).toBe(true)
+    expect(unusedOverrides.length).toBe(1)
+    expect(unusedOverrides[0].name).toBe('unused-pkg')
+    expect(unusedOverrides[0].version).toBe('1.0.0')
   })
 
   it('should return empty array when no unused overrides', () => {
@@ -193,7 +232,7 @@ describe('parseExplainOutput', () => {
   })
 
   it('should return empty array for non-overridden packages', () => {
-    const emptyExplainOutput: any[] = []
+    const emptyExplainOutput: NpmExplainOutput = []
     const result = parseExplainOutput(emptyExplainOutput)
 
     expect(Array.isArray(result)).toBe(true)
