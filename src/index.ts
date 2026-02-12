@@ -28,6 +28,9 @@ export interface PackageJson {
   name?: string;
   version?: string;
   overrides?: Record<string, string>;
+  pnpm?: {
+    overrides?: Record<string, string>;
+  };
 }
 
 /**
@@ -77,20 +80,26 @@ export function analyzeOverrides(targetDir: string = process.cwd()): PackageOver
  * Find unused overrides by comparing package.json overrides with actual overridden packages
  * @param targetDir - The directory to analyze
  * @param usedOverrides - Array of packages that are actually overridden
+ * @param packageJson - Optional pre-read package.json content
  * @returns Array of unused overrides
  */
-export function findUnusedOverrides(targetDir: string, usedOverrides: PackageOverride[]): UnusedOverride[] {
+export function findUnusedOverrides(targetDir: string, usedOverrides: PackageOverride[], packageJson?: PackageJson): UnusedOverride[] {
   try {
-    const packageJson = getPackageJson(targetDir);
+    const pkgJson = packageJson || getPackageJson(targetDir);
 
-    if (!packageJson.overrides) {
+    const combinedOverrides = {
+      ...pkgJson.overrides,
+      ...pkgJson.pnpm?.overrides,
+    };
+
+    if (Object.keys(combinedOverrides).length === 0) {
       return [];
     }
 
     const usedOverrideNames = new Set(usedOverrides.map(override => override.name));
     const unusedOverrides: UnusedOverride[] = [];
 
-    for (const [packageName, version] of Object.entries(packageJson.overrides)) {
+    for (const [packageName, version] of Object.entries(combinedOverrides)) {
       if (!usedOverrideNames.has(packageName)) {
         unusedOverrides.push({
           name: packageName,

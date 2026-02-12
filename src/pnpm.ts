@@ -28,11 +28,12 @@ interface PnpmWhyProject {
  * @returns Array of package overrides
  */
 export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson): PackageOverride[] {
-  if (!packageJson.overrides) {
-    return [];
-  }
+  const combinedOverrides = {
+    ...packageJson.overrides,
+    ...packageJson.pnpm?.overrides,
+  };
 
-  const packageNames = Object.keys(packageJson.overrides);
+  const packageNames = Object.keys(combinedOverrides);
   if (packageNames.length === 0) {
     return [];
   }
@@ -52,7 +53,7 @@ export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson
     const overrides: PackageOverride[] = [];
 
     for (const packageName of packageNames) {
-      const targetVersion = packageJson.overrides[packageName];
+      const targetVersion = combinedOverrides[packageName as keyof typeof combinedOverrides];
       const pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>> = [];
 
       for (const project of projects) {
