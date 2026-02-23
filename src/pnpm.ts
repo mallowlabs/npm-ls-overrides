@@ -2,23 +2,18 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 import { PackageOverride, PackageJson } from './index';
 
-interface PnpmWhyPackage {
-  from: string;
+interface PnpmWhyDependent {
+  name: string;
   version: string;
-  resolved?: string;
-  path?: string;
-  dependencies?: Record<string, PnpmWhyPackage>;
-  devDependencies?: Record<string, PnpmWhyPackage>;
-  optionalDependencies?: Record<string, PnpmWhyPackage>;
+  depField?: string; // e.g., "dependencies", "devDependencies"
+  dependents?: PnpmWhyDependent[]; // For reverse tree
 }
 
-interface PnpmWhyProject {
+interface PnpmWhyPackageOutput {
   name: string;
   version: string;
   path: string;
-  dependencies?: Record<string, PnpmWhyPackage>;
-  devDependencies?: Record<string, PnpmWhyPackage>;
-  optionalDependencies?: Record<string, PnpmWhyPackage>;
+  dependents?: PnpmWhyDependent[]; // The reverse dependency tree
 }
 
 /**
@@ -41,7 +36,7 @@ export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson
   try {
     const absolutePath = path.resolve(targetDir);
     // pnpm why <pkg> --json
-    const command = `pnpm why ${packageNames.join(' ')} --json`;
+    const command = `npx pnpm why ${packageNames.join(' ')} --json`;
 
     const output = execSync(command, {
       cwd: absolutePath,
@@ -49,36 +44,39 @@ export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson
       stdio: ['pipe', 'pipe', 'ignore']
     });
 
-    const projects: PnpmWhyProject[] = JSON.parse(output);
+    const pnpmWhyOutputs: PnpmWhyPackageOutput[] = JSON.parse(output);
+
+    // Check if the output format matches the expected new pnpm why format (reverse tree)
+    // If it's an empty array or the first element doesn't have 'dependents' field,
+    // it likely indicates an older pnpm version or unexpected output.
+    if (!Array.isArray(pnpmWhyOutputs) || pnpmWhyOutputs.length === 0 || !pnpmWhyOutputs[0].dependents) {
+      console.warn(
+        `[npm-ls-overrides] Warning: The output from 'pnpm why' command does not match the expected format. ` +
+        `This might be due to an older pnpm version. ` +
+        `Please consider upgrading pnpm to at least 10.30.0 for full functionality.`
+      );
+      return [];
+    }
     const overrides: PackageOverride[] = [];
 
     for (const packageName of packageNames) {
       const targetVersion = combinedOverrides[packageName as keyof typeof combinedOverrides];
       const pathsWithRawSpecs: Array<Array<{ name: string; rawSpec?: string }>> = [];
 
-      for (const project of projects) {
-        const projectRoot = `${project.name}@${project.version}`;
-        
-        // Traverse the dependency tree to find the package and its paths
-        findPackagePaths(
-          project.dependencies || {},
-          packageName,
-          [{ name: projectRoot }],
-          pathsWithRawSpecs
-        );
-        findPackagePaths(
-          project.devDependencies || {},
-          packageName,
-          [{ name: projectRoot }],
-          pathsWithRawSpecs
-        );
+      for (const pnpmWhyOutput of pnpmWhyOutputs) {
+        if (pnpmWhyOutput.name === packageName) {
+          // Reconstruct paths from the reverse dependency tree
+          // The root of the reverse tree is the package itself, its dependents are its parents
+          const reversePaths = getReverseDependencyPaths(pnpmWhyOutput.dependents || [], [{ name: `${pnpmWhyOutput.name}@${pnpmWhyOutput.version}` }]);
+          pathsWithRawSpecs.push(...reversePaths);
+        }
       }
 
       if (pathsWithRawSpecs.length > 0) {
         // In pnpm, we'll assume it's overridden if it appears in the tree
         // and is listed in the overrides field of package.json.
         // We take the version of the first occurrence found.
-        const actualVersion = findActualVersion(projects, packageName) || targetVersion;
+        const actualVersion = pnpmWhyOutputs.find(pkg => pkg.name === packageName)?.version || targetVersion;
 
         overrides.push({
           name: packageName,
@@ -97,53 +95,22 @@ export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson
 }
 
 /**
- * Recursively find all paths to a package in pnpm's dependency tree
+ * Recursively get all dependency paths from the reverse dependency tree
  */
-function findPackagePaths(
-  dependencies: Record<string, PnpmWhyPackage>,
-  targetName: string,
+function getReverseDependencyPaths(
+  dependents: PnpmWhyDependent[],
   currentPath: Array<{ name: string; rawSpec?: string }>,
-  results: Array<Array<{ name: string; rawSpec?: string }>>
-): void {
-  for (const [name, pkg] of Object.entries(dependencies)) {
-    const pkgNameWithVersion = `${name}@${pkg.version}`;
-    const newSegment = { name: pkgNameWithVersion, rawSpec: pkg.from !== name ? pkg.from : undefined };
+  results: Array<Array<{ name: string; rawSpec?: string }>> = []
+): Array<Array<{ name: string; rawSpec?: string }>> {
+  if (dependents.length === 0) {
+    results.push(currentPath.reverse()); // Reverse to get root -> target order
+    return results;
+  }
+
+  for (const dependent of dependents) {
+    const newSegment = { name: `${dependent.name}@${dependent.version}`, rawSpec: undefined }; // pnpm why doesn't provide rawSpec for dependents directly
     const newPath = [...currentPath, newSegment];
-
-    if (name === targetName) {
-      results.push(newPath);
-    }
-
-    if (pkg.dependencies) {
-      findPackagePaths(pkg.dependencies, targetName, newPath, results);
-    }
-    if (pkg.devDependencies) {
-      findPackagePaths(pkg.devDependencies, targetName, newPath, results);
-    }
-    if (pkg.optionalDependencies) {
-      findPackagePaths(pkg.optionalDependencies, targetName, newPath, results);
-    }
+    getReverseDependencyPaths(dependent.dependents || [], newPath, results);
   }
-}
-
-/**
- * Find the actual installed version of a package from pnpm why output
- */
-function findActualVersion(projects: PnpmWhyProject[], targetName: string): string | undefined {
-  const findInDeps = (deps: Record<string, PnpmWhyPackage>): string | undefined => {
-    for (const [name, pkg] of Object.entries(deps)) {
-      if (name === targetName) return pkg.version;
-      const nested = pkg.dependencies ? findInDeps(pkg.dependencies) : undefined;
-      if (nested) return nested;
-    }
-    return undefined;
-  };
-
-  for (const project of projects) {
-    const version = findInDeps(project.dependencies || {}) || 
-                    findInDeps(project.devDependencies || {}) ||
-                    findInDeps(project.optionalDependencies || {});
-    if (version) return version;
-  }
-  return undefined;
+  return results;
 }
