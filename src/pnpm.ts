@@ -36,7 +36,7 @@ export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson
   try {
     const absolutePath = path.resolve(targetDir);
     // pnpm why <pkg> --json
-    const command = `npx pnpm why ${packageNames.join(' ')} --json`;
+    const command = `pnpm why ${packageNames.join(' ')} --json`;
 
     const output = execSync(command, {
       cwd: absolutePath,
