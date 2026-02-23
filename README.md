@@ -25,6 +25,12 @@ The tool automatically detects the package manager by looking for lock files in 
 - If `pnpm-lock.yaml` exists, it uses **pnpm**.
 - Otherwise, it defaults to **npm**.
 
+### pnpm Version Requirement
+
+For **pnpm** projects, this tool requires `pnpm` version `10.30.0` or later.
+This is due to significant changes in the output format of the `pnpm why` command in older versions.
+If an older version of `pnpm` is detected, a warning will be displayed, and the analysis for `pnpm` overrides may not function correctly.
+
 ## Example
 
 ### Used Override
