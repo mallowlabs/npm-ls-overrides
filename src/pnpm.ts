@@ -45,6 +45,18 @@ export function analyzePnpmOverrides(targetDir: string, packageJson: PackageJson
     });
 
     const pnpmWhyOutputs: PnpmWhyPackageOutput[] = JSON.parse(output);
+
+    // Check if the output format matches the expected new pnpm why format (reverse tree)
+    // If it's an empty array or the first element doesn't have 'dependents' field,
+    // it likely indicates an older pnpm version or unexpected output.
+    if (!Array.isArray(pnpmWhyOutputs) || pnpmWhyOutputs.length === 0 || !pnpmWhyOutputs[0].dependents) {
+      console.warn(
+        `[npm-ls-overrides] Warning: The output from 'pnpm why' command does not match the expected format. ` +
+        `This might be due to an older pnpm version. ` +
+        `Please consider upgrading pnpm to at least 10.30.0 for full functionality.`
+      );
+      return [];
+    }
     const overrides: PackageOverride[] = [];
 
     for (const packageName of packageNames) {
