@@ -131,7 +131,9 @@ export function parseExplainOutput(explainOutput: NpmExplainOutput, aliasMap?: M
   const overrides: PackageOverride[] = [];
 
   for (const packageInfo of explainOutput) {
-    if (packageInfo.overridden === true) {
+    const isOverridden = packageInfo.overridden === true ||
+      packageInfo.dependents?.some(d => d.overridden === true);
+    if (isOverridden) {
       // Check if this package is aliased (npm explain returns alias name in packageInfo.name)
       const actualPackageName = aliasMap?.get(packageInfo.name);
 
