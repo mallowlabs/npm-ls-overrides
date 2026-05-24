@@ -35,7 +35,7 @@
     "typescript": "^6.0.3"
   },
   "devDependencies": {
-    "pnpm": "^11.1.2",
+    "pnpm": "^11.2.2",
     "tsx": "^4.22.3",
     "vitest": "^4.1.7"
   }
