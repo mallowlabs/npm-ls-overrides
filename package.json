@@ -37,6 +37,6 @@
   "devDependencies": {
     "pnpm": "^12.3.4",
     "tsx": "^4.23.13",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   }
 }
